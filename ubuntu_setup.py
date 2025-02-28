@@ -9,6 +9,23 @@ def run_command(command):
     except subprocess.CalledProcessError as e:
         print(f"Error executing {command}: {e}")
 
+def cleanup_ppa():
+    print("Cleaning up unreachable PPA repositories and those without Release files...")
+    # Get list of PPA repositories and check their availability
+    run_command("""
+        for f in /etc/apt/sources.list.d/*.list; do
+            grep -o '^deb http://ppa.launchpad.net/[a-z0-9\-]\+/[a-z0-9\-]\+' "$f" | while read ENTRY; do
+                PPA=${ENTRY#deb http://ppa.launchpad.net/}
+                HOST="ppa.launchpad.net"
+                if ! ping -c 1 "$HOST" >/dev/null 2>&1 || \
+                   ! curl --output /dev/null --silent --head --fail "http://$HOST/$PPA/ubuntu/dists/$(lsb_release -cs)/Release"; then
+                    echo "Removing unreachable PPA: $PPA"
+                    sudo add-apt-repository -r "ppa:$PPA" -y
+                fi
+            done
+        done
+    """)
+
 def main():
     # Update system and upgrade packages
     print("Updating system and upgrading packages...")
@@ -31,11 +48,9 @@ def main():
 
     # Install VS Code
     print("Installing VS Code...")
-    run_command("sudo apt install software-properties-common apt-transport-https wget -y")
-    run_command("wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -")
-    run_command("sudo add-apt-repository \"deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main\"")
-    run_command("sudo apt update")
-    run_command("sudo apt install code -y")
+    run_command("wget -O code.deb 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64'")
+    run_command("sudo apt install ./code.deb -y")
+    run_command("rm code.deb")
 
     # Install grub-customizer
     print("Installing grub-customizer...")
@@ -64,6 +79,9 @@ def main():
     run_command("sudo dpkg --add-architecture i386")
     run_command("sudo apt update")
     run_command("sudo apt install wine64 wine32 -y")
+
+    # Clean up PPA repositories without Release files
+    cleanup_ppa()
 
     print("\nSetup completed! Please restart your system for all changes to take effect.")
 

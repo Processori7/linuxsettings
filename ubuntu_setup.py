@@ -206,11 +206,11 @@ EndSection
             # Update LXQT-specific settings
             run_command("mkdir -p ~/.config/lxqt")
             lxqt_config = """[Keyboard]
-model=pc105
-layout=us,ru
-variant=,
-option=grp:ctrl_shift_toggle
-"""
+            model=pc105
+            layout=us,ru
+            variant=,
+            option=grp:ctrl_shift_toggle
+            """
             run_command(f"echo '{lxqt_config}' > ~/.config/lxqt/keyboard.conf")
             
             # Restart keyboard settings
@@ -250,6 +250,15 @@ option=grp:ctrl_shift_toggle
         run_command("sudo apt install wine64 wine32 -y")
     else:
         print("Wine is already installed")
+
+    # Uninstall FireFox
+    run_command("sudo apt purge firefox")
+    run_command("sudo apt autoremove")
+
+    # Install LibreWolf
+    run_command("sudo apt update && sudo apt install extrepo -y")
+    run_command("sudo extrepo enable librewolf")
+    run_command("sudo apt update && sudo apt install librewolf -y")
 
     # Clean up PPA repositories without Release files
     cleanup_ppa()

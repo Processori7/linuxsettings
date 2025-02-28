@@ -252,8 +252,8 @@ EndSection
         print("Wine is already installed")
 
     # Uninstall FireFox
-    run_command("sudo apt purge firefox")
-    run_command("sudo apt autoremove")
+    run_command("sudo apt purge firefox -y")
+    run_command("sudo apt autoremove -y")
 
     # Install LibreWolf
     run_command("sudo apt update && sudo apt install extrepo -y")

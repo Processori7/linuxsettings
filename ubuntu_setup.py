@@ -25,20 +25,37 @@ def check_ppa_exists(ppa_name):
 
 def cleanup_ppa():
     print("Cleaning up unreachable PPA repositories and those without Release files...")
-    # Get list of PPA repositories and check their availability
-    run_command("""
-        for f in /etc/apt/sources.list.d/*.list; do
-            grep -o '^deb http://ppa.launchpad.net/[a-z0-9\-]\+/[a-z0-9\-]\+' "$f" | while read ENTRY; do
-                PPA=${ENTRY#deb http://ppa.launchpad.net/}
-                HOST="ppa.launchpad.net"
-                if ! ping -c 1 "$HOST" >/dev/null 2>&1 || \
-                   ! curl --output /dev/null --silent --head --fail "http://$HOST/$PPA/ubuntu/dists/$(lsb_release -cs)/Release"; then
-                    echo "Removing unreachable PPA: $PPA"
-                    sudo add-apt-repository -r "ppa:$PPA" -y
-                fi
-            done
-        done
-    """)
+    # First, get a list of all PPA files
+    try:
+        ppa_files = subprocess.run(["find", "/etc/apt/sources.list.d/", "-name", "*.list"], 
+                                 capture_output=True, text=True, check=True)
+        
+        for ppa_file in ppa_files.stdout.splitlines():
+            try:
+                # Extract PPA URLs from the file
+                grep_result = subprocess.run(["grep", "-o", "^deb http://ppa.launchpad.net/[a-z0-9-]\+/[a-z0-9-]\+", ppa_file],
+                                           capture_output=True, text=True)
+                
+                for line in grep_result.stdout.splitlines():
+                    # Extract PPA name
+                    ppa = line.replace("deb http://ppa.launchpad.net/", "").strip()
+                    if ppa:
+                        # Check if PPA is reachable
+                        try:
+                            # Try to fetch the Release file
+                            release_url = f"http://ppa.launchpad.net/{ppa}/ubuntu/dists/$(lsb_release -cs)/Release"
+                            curl_result = subprocess.run(["curl", "--output", "/dev/null", "--silent", "--head", "--fail", release_url],
+                                                       capture_output=True)
+                            
+                            if curl_result.returncode != 0:
+                                print(f"PPA {ppa} is unreachable or has no Release file")
+                                run_command(f"sudo add-apt-repository -r 'ppa:{ppa}' -y")
+                        except subprocess.CalledProcessError:
+                            print(f"Failed to check PPA: {ppa}")
+            except subprocess.CalledProcessError:
+                continue
+    except subprocess.CalledProcessError as e:
+        print(f"Error while cleaning up PPAs: {e}")
 
 def main():
     # Update system and upgrade packages
@@ -180,8 +197,26 @@ EndSection
         
         if needs_update:
             print("Updating keyboard layout configuration...")
+            # Create X11 config file
             run_command(f"echo '{xkb_config}' | sudo tee {xkb_config_file} > /dev/null")
+            
+            # Apply settings immediately
             run_command("setxkbmap -layout 'us,ru' -option 'grp:ctrl_shift_toggle'")
+            
+            # Update LXQT-specific settings
+            run_command("mkdir -p ~/.config/lxqt")
+            lxqt_config = """[Keyboard]
+model=pc105
+layout=us,ru
+variant=,
+option=grp:ctrl_shift_toggle
+"""
+            run_command(f"echo '{lxqt_config}' > ~/.config/lxqt/keyboard.conf")
+            
+            # Restart keyboard settings
+            run_command("setxkbmap -layout 'us,ru' -option 'grp:ctrl_shift_toggle'")
+            run_command("lxqt-config-input --reload")
+            
             print("\nVerifying new settings:")
             print_current_settings()
         else:

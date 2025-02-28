@@ -256,7 +256,7 @@ EndSection
     run_command("sudo apt autoremove -y")
 
     # Install LibreWolf
-    run_command("sudo apt update && sudo apt install extrepo -y")
+    run_command("sudo apt install extrepo -y")
     run_command("sudo extrepo enable librewolf")
     run_command("sudo apt update && sudo apt install librewolf -y")
 

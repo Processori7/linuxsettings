@@ -33,7 +33,9 @@
 1. Склонируйте репозиторий:
    ```bash
    git clone https://github.com/Processori7/linuxsettings.git
-   cd ubuntu_setting
+   ```  
+   ```
+   cd linuxsettings
    ```
 
 2. Запустите скрипт:

@@ -97,21 +97,95 @@ def main():
     else:
         print("grub-customizer is already installed")
 
-    # Configure keyboard layout switching
-    print("Configuring keyboard layout switching...")
+   # Configure keyboard layout switching
+    print("\nChecking keyboard layout configuration...")
     desktop_env = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+    
+    def print_current_settings():
+        print("Current keyboard layout settings:")
+        if 'gnome' in desktop_env:
+            try:
+                sources = subprocess.run(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"], 
+                                        capture_output=True, text=True).stdout.strip()
+                options = subprocess.run(["gsettings", "get", "org.gnome.desktop.input-sources", "xkb-options"], 
+                                        capture_output=True, text=True).stdout.strip()
+                print(f"Layout sources: {sources}")
+                print(f"Keyboard options: {options}")
+            except Exception as e:
+                print(f"Error reading GNOME settings: {e}")
+        elif 'lxqt' in desktop_env:
+            try:
+                current_layout = subprocess.run(["setxkbmap", "-query"], capture_output=True, text=True).stdout
+                print(current_layout)
+            except Exception as e:
+                print(f"Error reading LXQT settings: {e}")
+    
+    print_current_settings()
+    print("\nConfiguring keyboard layout switching...")
+    
     if 'gnome' in desktop_env:
         # GNOME desktop environment (Ubuntu)
-        run_command("gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'us'), ('xkb', 'ru')]\"")
-        run_command("gsettings set org.gnome.desktop.input-sources xkb-options \"['grp:ctrl_shift_toggle']\"")
+        current_sources = subprocess.run(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"], 
+                                       capture_output=True, text=True).stdout.strip()
+        current_options = subprocess.run(["gsettings", "get", "org.gnome.desktop.input-sources", "xkb-options"], 
+                                       capture_output=True, text=True).stdout.strip()
+        
+        if "[('xkb', 'us'), ('xkb', 'ru')]" not in current_sources:
+            run_command("gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'us'), ('xkb', 'ru')]\"")
+            print("Updated keyboard layouts to US and RU")
+        
+        if "['grp:ctrl_shift_toggle']" not in current_options:
+            run_command("gsettings set org.gnome.desktop.input-sources xkb-options \"['grp:ctrl_shift_toggle']\"")
+            print("Updated keyboard switch shortcut to Ctrl+Shift")
+        
+        print("\nVerifying new settings:")
+        print_current_settings()
+        
     elif 'lxqt' in desktop_env:
         # LXQT desktop environment (Lubuntu)
-        config_dir = os.path.expanduser('~/.config/lxqt')
-        os.makedirs(config_dir, exist_ok=True)
-        run_command(f"echo 'Keyboard Layout=us,ru' > {config_dir}/keyboard.conf")
-        run_command(f"echo 'Keyboard Model=pc105' >> {config_dir}/keyboard.conf")
-        run_command(f"echo 'Keyboard Options=grp:ctrl_shift_toggle' >> {config_dir}/keyboard.conf")
-        run_command("setxkbmap -layout 'us,ru' -option 'grp:ctrl_shift_toggle'")
+        xkb_config_file = "/etc/X11/xorg.conf.d/00-keyboard.conf"
+        xkb_config = """\
+Section "InputClass"
+        Identifier "system-keyboard"
+        MatchIsKeyboard "on"
+        Option "XkbLayout" "us,ru"
+        Option "XkbModel" "pc105"
+        Option "XkbOptions" "grp:ctrl_shift_toggle"
+EndSection
+"""
+        
+        # Check if config directory exists, create if not
+        if not os.path.exists("/etc/X11/xorg.conf.d"):
+            run_command("sudo mkdir -p /etc/X11/xorg.conf.d")
+        
+        # Check current keyboard settings
+        current_settings = subprocess.run(["setxkbmap", "-query"], capture_output=True, text=True).stdout
+        needs_update = False
+        
+        if "layout:     us,ru" not in current_settings or "option:     grp:ctrl_shift_toggle" not in current_settings:
+            needs_update = True
+        
+        # Check if config file exists and has correct settings
+        if os.path.exists(xkb_config_file):
+            try:
+                with open(xkb_config_file, 'r') as f:
+                    current_config = f.read()
+                    if 'XkbLayout "us,ru"' not in current_config or 'XkbOptions "grp:ctrl_shift_toggle"' not in current_config:
+                        needs_update = True
+            except Exception as e:
+                print(f"Error reading keyboard config: {e}")
+                needs_update = True
+        else:
+            needs_update = True
+        
+        if needs_update:
+            print("Updating keyboard layout configuration...")
+            run_command(f"echo '{xkb_config}' | sudo tee {xkb_config_file} > /dev/null")
+            run_command("setxkbmap -layout 'us,ru' -option 'grp:ctrl_shift_toggle'")
+            print("\nVerifying new settings:")
+            print_current_settings()
+        else:
+            print("Keyboard layout configuration is correct and up to date")
     else:
         print("Unsupported desktop environment for automatic keyboard layout configuration")
 

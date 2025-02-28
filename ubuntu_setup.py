@@ -99,8 +99,21 @@ def main():
 
     # Configure keyboard layout switching
     print("Configuring keyboard layout switching...")
-    run_command("gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'us'), ('xkb', 'ru')]\"")
-    run_command("gsettings set org.gnome.desktop.input-sources xkb-options \"['grp:ctrl_shift_toggle']\"")
+    desktop_env = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
+    if 'gnome' in desktop_env:
+        # GNOME desktop environment (Ubuntu)
+        run_command("gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'us'), ('xkb', 'ru')]\"")
+        run_command("gsettings set org.gnome.desktop.input-sources xkb-options \"['grp:ctrl_shift_toggle']\"")
+    elif 'lxqt' in desktop_env:
+        # LXQT desktop environment (Lubuntu)
+        config_dir = os.path.expanduser('~/.config/lxqt')
+        os.makedirs(config_dir, exist_ok=True)
+        run_command(f"echo 'Keyboard Layout=us,ru' > {config_dir}/keyboard.conf")
+        run_command(f"echo 'Keyboard Model=pc105' >> {config_dir}/keyboard.conf")
+        run_command(f"echo 'Keyboard Options=grp:ctrl_shift_toggle' >> {config_dir}/keyboard.conf")
+        run_command("setxkbmap -layout 'us,ru' -option 'grp:ctrl_shift_toggle'")
+    else:
+        print("Unsupported desktop environment for automatic keyboard layout configuration")
 
     # Install Stacer
     print("Checking and installing Stacer...")
